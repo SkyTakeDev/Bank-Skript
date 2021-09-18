@@ -1,0 +1,110 @@
+options:
+  pf: &c&lPREFIX &8» &7
+  noperm: &c&lPREFIX &8» &7Keine Rechte!
+  currency: €
+
+command /bank [<text>] [<integer>] [<offline player>]:
+  trigger:
+    if arg 1 is not set:
+      send "{@pf}Bitte verwende /bank einzahlen/auszahlen/guthaben!" to the sender
+    else:
+      if arg 1 is not "guthaben" or "auszahlen" or "einzahlen":
+        execute player command "/bank"
+      if arg 1 is "guthaben":
+        send "{@pf}Dein Konto beträgt: &b%{bank::%player%}%&b{@currency}." to the sender
+      if arg 1 is "auszahlen":
+        if arg 2 is not set:
+          send "{@pf}Bitte verwende &7/bank auszahlen <Betrag>!" to the sender
+        else:
+          if arg 2 is not more than {bank::%player%}:
+            send "{@pf}Du hast &b%arg 2%&b{@currency} &7ausgezahlt." to the sender
+            subtract arg 2 from {bank::%player%}
+            add arg 2 to player's balance
+          else:
+            send "{@pf}Du hast nicht genug Geld!" to the sender
+            wait 1 tick
+            execute player command "/bank guthaben"
+      if arg 1 is "einzahlen":
+        if arg 2 is not set:
+          send "{@pf}Bitte verwende &7/bank einzahlen <Betrag>!" to the sender
+        else:
+          if arg 2 is not more than player's balance:
+            send "{@pf}Du hast &b%arg 2%&b{@currency} &7eingezahlt." to the sender
+            subtract arg 2 from player's balance
+            add arg 2 to {bank::%player%}
+          else:
+            send "{@pf}Du hast nicht genug Geld!" to the sender
+            send "{@pf}Du hast: &b%player's balance%&b{@currency}." to the sender
+on join:
+  if {bank::%player%} is not set:
+    set {bank::%player%} to 0
+  if {bank::players2::*} do not contain "%player's uuid%":
+    add "%player's uuid%" to {bank::players2::*}
+
+command /bankadmin [<text>] [<offline player>] [<integer>]:
+  trigger:
+    if player do not have permission "bank.admin":
+      send "{@noperm}" to the sender
+    else:
+      if arg 2 is not set:
+        send "&6--------------------&c&lPREFIX2&6---------------------" to the sender
+        send "&a/bankadmin add <Spieler> <Betrag> &8| &7Um einen Betrag zum Konto eines Spieler hinzuzufügen." to the sender
+        send "&a/bankadmin remove <Spieler> <Betrag> &8| &7Um einen Betrag vom Konto eines Spieler entfernen." to the sender
+        send "&a/bankadmin reset <Spieler> &8| &7Um das Konto eines Spielers zurückzusetzen." to the sender
+        send "&a/bankadmin guthaben <Spieler> &8| &7Um das Geld eines Spielers zu sehen." to the sender
+        send "&6--------------------&c&lPREFIX2&6---------------------" to the sender
+      else:
+        if arg 1 is not "add" or "remove" or "reset" or "subtract" or "guthaben":
+          set {_player} to arg 1 parsed as player
+          if {bank::players2::*} do not contain {_player}'s uuid:
+            execute player command "/bankadmin"
+          else:
+
+        else:
+          if arg 1 is "add":
+            add arg 3 to {bank::%arg 2%}
+            send "{@pf}Du hast &b%arg 3%&b{@currency} &7zum Konto von &c%arg 2% &7hinzugefügt." to the sender
+            execute player command "/adminbank guthaben %arg 2%"
+          if arg 1 is "remove" or "subtract":
+            subtract arg 3 from {bank::%arg 2%}
+            send "{@pf}Du hast &b%arg 3%&b{@currency} &7vom Konto von &c%arg 2% &7entfernt" to the sender
+            execute player command "/adminbank guthaben %arg 2%"
+          if arg 1 is "reset":
+            set {bank::%arg 2%} to 0
+            send "{@pf}Du hast das Guthaben von &c%arg 2% &7zurückgesetzt." to the sender
+          if arg 1 is "guthaben":
+            send "{@pf}Der Spieler &c%arg 2% &7hat aktuell &b%{bank::%arg 2%}%&b{@currency} &7auf seinem Konto." to the sender
+on chat:
+  if {bank::chat::abheben::%player%} is "true":
+    cancel event
+    if uncoloured message is "cancel":
+      delete {bank::chat::abheben::%player%}
+      send "{@pf}Du hast den Vorgang abgebrochen" to sender
+    else:
+      execute player command "/bank auszahlen %uncoloured message%"
+      delete {bank::chat::einzahlen::%player%}
+  else if {bank::chat::überweisen::%player%} is "true":
+    cancel event
+    if uncoloured message is "cancel":
+      delete {bank::chat::überweisen::%player%}
+      send "{@pf}Du hast den Vorgang abgebrochen" to sender
+    else:
+      set {bank::chat::überweisen::2::%player%} to uncoloured message parsed as player
+      send "{@pf}Schreibe jetzt den Betrag den du &a%uncoloured message parsed as player% &bgeben möchtest" to sender
+      delete {bank::chat::überweisen::%player%}
+  else if {bank::chat::einzahlen::%player%} is "true":
+    cancel event
+    if uncoloured message is "cancel":
+      delete {bank::chat::einzahlen::%player%}
+      send "{@pf}Du hast den Vorgang abgebrochen" to sender
+    else:
+      execute player command "/bank einzahlen %uncoloured message%"
+      delete {bank::chat::einzahlen::%player%}
+  else if {bank::chat::überweisen::2::%player%} is set:
+    cancel event
+    if uncoloured message is "cancel":
+      delete {bank::chat::überweisen::2::%player%}
+      send "{@pf}Du hast den Vorgang abgebrochen" to sender
+    else:
+      execute player command "/bank überweisen %uncoloured message% %{bank::chat::überweisen::2::%player%}%"
+      delete {bank::chat::überweisen::2::%player%}
